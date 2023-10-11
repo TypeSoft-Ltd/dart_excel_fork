@@ -547,73 +547,96 @@ class Parser {
       return;
     }
 
-    dynamic value;
     String? type = node.getAttribute('t');
 
-    switch (type) {
+    // Traverse descendants in case of 'inlineStr' instead of direct children and looks for different attribute
+    final valueNodes = type == 'inlineStr'
+        ? node.findAllElements('t')
+        : node.findElements('v');
+    // BUG FIX: Cells containing formula can have a result of empty string.
+    // Empty string is not parsed to XML, so even though children are not empty, there's no <v> tag present in children
+    // We need to check that 'v' tag exists, otherwise we get Bad State: No Element error
+    final valueXmlElement = valueNodes.isEmpty ? null : valueNodes.first;
+
+    final value = _getValueForDataType(
+      node: node,
+      dataType: type,
+      valueNode: valueXmlElement,
+      styleIndexNode: s1,
+      styleIndex: s,
+    );
+
+    sheetObject.updateCell(
+        CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex),
+        value,
+        cellStyle: _excel._cellStyleList[s]);
+  }
+
+  dynamic _getValueForDataType({
+    required XmlElement node,
+    required String? dataType,
+    required XmlElement? valueNode,
+    required String? styleIndexNode,
+    required int styleIndex,
+  }) {
+    if (valueNode == null) {
+      return null;
+    }
+
+    switch (dataType) {
       // sharedString
       case 's':
-        value = _excel._sharedStrings
-            .value(int.parse(_parseValue(node.findElements('v').first)));
-        break;
+        return _excel._sharedStrings.value(int.parse(_parseValue(valueNode)));
       // boolean
       case 'b':
-        value = _parseValue(node.findElements('v').first) == '1';
-        break;
+        return _parseValue(valueNode) == '1';
       // error
       case 'e':
       // formula
       case 'str':
-        value = _parseValue(node.findElements('v').first);
-        break;
+        return _parseValue(valueNode);
       // inline string
       case 'inlineStr':
         // <c r='B2' t='inlineStr'>
         // <is><t>Dartonico</t></is>
         // </c>
-        value = _parseValue(node.findAllElements('t').first);
-        break;
+        return _parseValue(valueNode);
       // number
       case 'n':
       default:
-        var valueNode = node.findElements('v');
         var formulaNode = node.findElements('f');
-        var content = valueNode.first;
         if (formulaNode.isNotEmpty) {
-          value = Formula.custom(_parseValue(formulaNode.first).toString());
-        } else {
-          if (s1 != null) {
-            var fmtId = _excel._numFormats[s];
-            // date
-            if (((fmtId >= 14) && (fmtId <= 17)) ||
-                (fmtId == 22) ||
-                (fmtId == 164)) {
-              var delta = num.parse(_parseValue(content)) * 24 * 3600 * 1000;
-              var date = DateTime(1899, 12, 30);
-              value = date
-                  .add(Duration(milliseconds: delta.toInt()))
-                  .toIso8601String();
-              // time
-            } else if (((fmtId >= 18) && (fmtId <= 21)) ||
-                ((fmtId >= 45) && (fmtId <= 47))) {
-              var delta = num.parse(_parseValue(content)) * 24 * 3600 * 1000;
-              var date = DateTime(0);
-              date = date.add(Duration(milliseconds: delta.toInt()));
-              value =
-                  '${_twoDigits(date.hour)}:${_twoDigits(date.minute)}:${_twoDigits(date.second)}';
-              // number
-            } else {
-              value = num.parse(_parseValue(content));
-            }
-          } else {
-            value = num.parse(_parseValue(content));
-          }
+          return Formula.custom(_parseValue(formulaNode.first).toString());
         }
+
+        if (styleIndexNode != null) {
+          var fmtId = _excel._numFormats[styleIndex];
+          // date
+          if (((fmtId >= 14) && (fmtId <= 17)) ||
+              (fmtId == 22) ||
+              (fmtId == 164)) {
+            var delta = num.parse(_parseValue(valueNode)) * 24 * 3600 * 1000;
+            var date = DateTime(1899, 12, 30);
+            return date
+                .add(Duration(milliseconds: delta.toInt()))
+                .toIso8601String();
+            // time
+          }
+
+          if (((fmtId >= 18) && (fmtId <= 21)) ||
+              ((fmtId >= 45) && (fmtId <= 47))) {
+            var delta = num.parse(_parseValue(valueNode)) * 24 * 3600 * 1000;
+            var date = DateTime(0);
+            date = date.add(Duration(milliseconds: delta.toInt()));
+            return '${_twoDigits(date.hour)}:${_twoDigits(date.minute)}:${_twoDigits(date.second)}';
+            // number
+          }
+
+          return num.parse(_parseValue(valueNode));
+        }
+
+        return num.parse(_parseValue(valueNode));
     }
-    sheetObject.updateCell(
-        CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex),
-        value,
-        cellStyle: _excel._cellStyleList[s]);
   }
 
   static _parseValue(XmlElement node) {
