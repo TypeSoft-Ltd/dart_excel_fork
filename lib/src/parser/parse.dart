@@ -33,8 +33,7 @@ class Parser {
       _damagedExcel();
     }
     file!.decompress();
-    _excel._xmlFiles["[Content_Types].xml"] =
-        XmlDocument.parse(utf8.decode(file.content));
+    _excel._xmlFiles["[Content_Types].xml"] = XmlDocument.parse(utf8.decode(file.content));
   }
 
   _parseRelations() {
@@ -70,8 +69,7 @@ class Parser {
   }
 
   _parseSharedStrings() {
-    var sharedStrings =
-        _excel._archive.findFile('xl/${_excel._sharedStringsTarget}');
+    var sharedStrings = _excel._archive.findFile('xl/${_excel._sharedStringsTarget}');
     if (sharedStrings == null) {
       _excel._sharedStringsTarget = 'sharedStrings.xml';
 
@@ -82,11 +80,7 @@ class Parser {
       if (_excel._xmlFiles.containsKey("xl/_rels/workbook.xml.rels")) {
         int rIdNumber = _getAvailableRid();
 
-        _excel._xmlFiles["xl/_rels/workbook.xml.rels"]
-            ?.findAllElements('Relationships')
-            .first
-            .children
-            .add(XmlElement(
+        _excel._xmlFiles["xl/_rels/workbook.xml.rels"]?.findAllElements('Relationships').first.children.add(XmlElement(
               XmlName('Relationship'),
               <XmlAttribute>[
                 XmlAttribute(XmlName('Id'), 'rId$rIdNumber'),
@@ -98,24 +92,17 @@ class Parser {
         if (!_rId.contains('rId$rIdNumber')) {
           _rId.add('rId$rIdNumber');
         }
-        String content =
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
+        String content = "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
         bool contain = true;
 
-        _excel._xmlFiles["[Content_Types].xml"]
-            ?.findAllElements('Override')
-            .forEach((node) {
+        _excel._xmlFiles["[Content_Types].xml"]?.findAllElements('Override').forEach((node) {
           var value = node.getAttribute('ContentType');
           if (value == content) {
             contain = false;
           }
         });
         if (contain) {
-          _excel._xmlFiles["[Content_Types].xml"]
-              ?.findAllElements('Types')
-              .first
-              .children
-              .add(XmlElement(
+          _excel._xmlFiles["[Content_Types].xml"]?.findAllElements('Types').first.children.add(XmlElement(
                 XmlName('Override'),
                 <XmlAttribute>[
                   XmlAttribute(XmlName('PartName'), '/xl/sharedStrings.xml'),
@@ -127,10 +114,8 @@ class Parser {
 
       var content = utf8.encode(
           "<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" count=\"0\" uniqueCount=\"0\"/>");
-      _excel._archive.addFile(ArchiveFile(
-          'xl/${_excel._sharedStringsTarget}', content.length, content));
-      sharedStrings =
-          _excel._archive.findFile('xl/${_excel._sharedStringsTarget}');
+      _excel._archive.addFile(ArchiveFile('xl/${_excel._sharedStringsTarget}', content.length, content));
+      sharedStrings = _excel._archive.findFile('xl/${_excel._sharedStringsTarget}');
     }
     sharedStrings!.decompress();
     var document = XmlDocument.parse(utf8.decode(sharedStrings.content));
@@ -188,8 +173,7 @@ class Parser {
           }
           spannedCells[sheetName] = spanList;
 
-          List<int> startIndex = _cellCoordsFromCellId(startCell),
-              endIndex = _cellCoordsFromCellId(endCell);
+          List<int> startIndex = _cellCoordsFromCellId(startCell), endIndex = _cellCoordsFromCellId(endCell);
           _Span spanObj = _Span();
           spanObj._start = [startIndex[0], startIndex[1]];
           spanObj._end = [endIndex[0], endIndex[1]];
@@ -243,18 +227,10 @@ class Parser {
       });
 
       document.findAllElements('border').forEach((node) {
-        final diagonalUp = !['0', 'false', null]
-            .contains(node.getAttribute('diagonalUp')?.trim());
-        final diagonalDown = !['0', 'false', null]
-            .contains(node.getAttribute('diagonalDown')?.trim());
+        final diagonalUp = !['0', 'false', null].contains(node.getAttribute('diagonalUp')?.trim());
+        final diagonalDown = !['0', 'false', null].contains(node.getAttribute('diagonalDown')?.trim());
 
-        const List<String> borderElementNamesList = [
-          'left',
-          'right',
-          'top',
-          'bottom',
-          'diagonal'
-        ];
+        const List<String> borderElementNamesList = ['left', 'right', 'top', 'bottom', 'diagonal'];
         Map<String, Border> borderElements = {};
         for (var elementName in borderElementNamesList) {
           XmlElement? element;
@@ -266,9 +242,7 @@ class Parser {
           }
 
           final borderStyleAttribute = element?.getAttribute('style')?.trim();
-          final borderStyle = borderStyleAttribute != null
-              ? getBorderStyleByName(borderStyleAttribute)
-              : null;
+          final borderStyle = borderStyleAttribute != null ? getBorderStyleByName(borderStyleAttribute) : null;
 
           String? borderColorHex;
           try {
@@ -276,8 +250,7 @@ class Parser {
             borderColorHex = color?.getAttribute('rgb')?.trim();
           } on StateError catch (_) {}
 
-          borderElements[elementName] =
-              Border(borderStyle: borderStyle, borderColorHex: borderColorHex);
+          borderElements[elementName] = Border(borderStyle: borderStyle, borderColorHex: borderColorHex);
         }
 
         final borderSet = _BorderSet(
@@ -479,8 +452,17 @@ class Parser {
 
     Sheet sheetObject = _excel._sheetMap['$name']!;
 
-    var file = _excel._archive.findFile('xl/$target');
-    file!.decompress();
+    var filePath = 'xl/$target';
+    if (target != null && target.startsWith('/')) {
+      // python package saves the relation targets as an absolute path in archive
+      filePath = target.substring(1);
+    }
+
+    var file = _excel._archive.findFile(filePath);
+    if (file == null) {
+      throw Exception('File $filePath not found in Excel archive.');
+    }
+    file.decompress();
 
     var content = XmlDocument.parse(utf8.decode(file.content));
     var worksheet = content.findElements('worksheet').first;
@@ -550,9 +532,7 @@ class Parser {
     String? type = node.getAttribute('t');
 
     // Traverse descendants in case of 'inlineStr' instead of direct children and looks for different attribute
-    final valueNodes = type == 'inlineStr'
-        ? node.findAllElements('t')
-        : node.findElements('v');
+    final valueNodes = type == 'inlineStr' ? node.findAllElements('t') : node.findElements('v');
     // BUG FIX: Cells containing formula can have a result of empty string.
     // Empty string is not parsed to XML, so even though children are not empty, there's no <v> tag present in children
     // We need to check that 'v' tag exists, otherwise we get Bad State: No Element error
@@ -566,9 +546,7 @@ class Parser {
       styleIndex: s,
     );
 
-    sheetObject.updateCell(
-        CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex),
-        value,
+    sheetObject.updateCell(CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex), value,
         cellStyle: _excel._cellStyleList[s]);
   }
 
@@ -612,19 +590,14 @@ class Parser {
         if (styleIndexNode != null) {
           var fmtId = _excel._numFormats[styleIndex];
           // date
-          if (((fmtId >= 14) && (fmtId <= 17)) ||
-              (fmtId == 22) ||
-              (fmtId == 164)) {
+          if (((fmtId >= 14) && (fmtId <= 17)) || (fmtId == 22) || (fmtId == 164)) {
             var delta = num.parse(_parseValue(valueNode)) * 24 * 3600 * 1000;
             var date = DateTime(1899, 12, 30);
-            return date
-                .add(Duration(milliseconds: delta.toInt()))
-                .toIso8601String();
+            return date.add(Duration(milliseconds: delta.toInt())).toIso8601String();
             // time
           }
 
-          if (((fmtId >= 18) && (fmtId <= 21)) ||
-              ((fmtId >= 45) && (fmtId <= 47))) {
+          if (((fmtId >= 18) && (fmtId <= 21)) || ((fmtId >= 45) && (fmtId <= 47))) {
             var delta = num.parse(_parseValue(valueNode)) * 24 * 3600 * 1000;
             var date = DateTime(0);
             date = date.add(Duration(milliseconds: delta.toInt()));
@@ -681,9 +654,7 @@ class Parser {
     int _sheetId = -1;
     List<int> sheetIdList = <int>[];
 
-    _excel._xmlFiles['xl/workbook.xml']
-        ?.findAllElements('sheet')
-        .forEach((sheetIdNode) {
+    _excel._xmlFiles['xl/workbook.xml']?.findAllElements('sheet').forEach((sheetIdNode) {
       var sheetId = sheetIdNode.getAttribute('sheetId');
       if (sheetId != null) {
         int t = int.parse(sheetId.toString());
@@ -728,11 +699,7 @@ class Parser {
       _rId.add('rId$ridNumber');
     }
 
-    _excel._xmlFiles['xl/workbook.xml']
-        ?.findAllElements('sheets')
-        .first
-        .children
-        .add(XmlElement(
+    _excel._xmlFiles['xl/workbook.xml']?.findAllElements('sheets').first.children.add(XmlElement(
           XmlName('sheet'),
           <XmlAttribute>[
             XmlAttribute(XmlName('state'), 'visible'),
@@ -747,32 +714,24 @@ class Parser {
     var content = utf8.encode(
         "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"x14ac xr xr2 xr3\" xmlns:x14ac=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac\" xmlns:xr=\"http://schemas.microsoft.com/office/spreadsheetml/2014/revision\" xmlns:xr2=\"http://schemas.microsoft.com/office/spreadsheetml/2015/revision2\" xmlns:xr3=\"http://schemas.microsoft.com/office/spreadsheetml/2016/revision3\"> <dimension ref=\"A1\"/> <sheetViews> <sheetView workbookViewId=\"0\"/> </sheetViews> <sheetData/> <pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/> </worksheet>");
 
-    _excel._archive.addFile(ArchiveFile(
-        'xl/worksheets/sheet${sheetNumber}.xml', content.length, content));
-    var _newSheet =
-        _excel._archive.findFile('xl/worksheets/sheet${sheetNumber}.xml');
+    _excel._archive.addFile(ArchiveFile('xl/worksheets/sheet${sheetNumber}.xml', content.length, content));
+    var _newSheet = _excel._archive.findFile('xl/worksheets/sheet${sheetNumber}.xml');
 
     _newSheet!.decompress();
     var document = XmlDocument.parse(utf8.decode(_newSheet.content));
     _excel._xmlFiles['xl/worksheets/sheet${sheetNumber}.xml'] = document;
     _excel._xmlSheetId[newSheet] = 'xl/worksheets/sheet${sheetNumber}.xml';
 
-    _excel._xmlFiles['[Content_Types].xml']
-        ?.findAllElements('Types')
-        .first
-        .children
-        .add(XmlElement(
+    _excel._xmlFiles['[Content_Types].xml']?.findAllElements('Types').first.children.add(XmlElement(
           XmlName('Override'),
           <XmlAttribute>[
-            XmlAttribute(XmlName('ContentType'),
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml'),
             XmlAttribute(
-                XmlName('PartName'), '/xl/worksheets/sheet${sheetNumber}.xml'),
+                XmlName('ContentType'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml'),
+            XmlAttribute(XmlName('PartName'), '/xl/worksheets/sheet${sheetNumber}.xml'),
           ],
         ));
     if (_excel._xmlFiles['xl/workbook.xml'] != null) {
-      _parseTable(
-          _excel._xmlFiles['xl/workbook.xml']!.findAllElements('sheet').last);
+      _parseTable(_excel._xmlFiles['xl/workbook.xml']!.findAllElements('sheet').last);
     }
   }
 
