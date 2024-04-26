@@ -443,12 +443,13 @@ class Parser {
   }
 
   _parseTable(XmlElement node) {
-    var name = node.getAttribute('name')!;
-    var target = _worksheetTargets[node.getAttribute('r:id')];
+    final name = node.getAttribute('name')!;
+    final target = _worksheetTargets[node.getAttribute('r:id')];
 
     // BUG FIX(Pavel): Some targets may be null. For example if we have a Chart Sheet, the Type attribute is not
     // the _relationshipsWorksheet. Thus it is not parsed to the _worksheetTargets
     if (target == null) {
+      print('EXCEL PARSE ERROR: Failed to parse sheet $name. Proceeding without it');
       return;
     }
 
@@ -460,11 +461,11 @@ class Parser {
 
     var filePath = 'xl/$target';
     if (target.startsWith('/')) {
-      // python package saves the relation targets as an absolute path in archive
+      // BUG FIX(Betka): python package saves the relation targets as an absolute path in archive
       filePath = target.substring(1);
     }
 
-    var file = _excel._archive.findFile(filePath);
+    final file = _excel._archive.findFile(filePath);
     if (file == null) {
       throw Exception('File $filePath not found in Excel archive.');
     }
@@ -515,14 +516,14 @@ class Parser {
       return;
     }
 
-    var styleIndexNode = node.getAttribute(CellAttributeTag.style);
+    final styleIndexNode = node.getAttribute(CellAttributeTag.style);
     int cellStyleIndex = 0;
     if (styleIndexNode != null) {
       try {
         cellStyleIndex = int.parse(styleIndexNode.toString());
       } catch (_) {}
 
-      String referenceNode = node.getAttribute(CellAttributeTag.reference).toString();
+      final referenceNode = node.getAttribute(CellAttributeTag.reference).toString();
 
       if (_excel._cellStyleReferenced[name] == null) {
         _excel._cellStyleReferenced[name] = {referenceNode: cellStyleIndex};
@@ -535,7 +536,7 @@ class Parser {
       return;
     }
 
-    String? type = node.getAttribute(CellAttributeTag.type);
+    final type = node.getAttribute(CellAttributeTag.type);
     final cellDataType = CellDataType.values.firstWhereOrNull((cellType) => cellType.stringType == type);
 
     // Traverse descendants in case of 'inlineStr' instead of direct children and looks for different attribute
@@ -590,9 +591,9 @@ class Parser {
       default:
         final formulaNode = node.findElements(CellElementTag.formula).firstOrNull;
         if (formulaNode != null) {
-          final formulaValueNode = node.findElements(CellElementTag.value).firstOrNull;
-
           final formula = _parseValue(formulaNode).toString();
+
+          final formulaValueNode = node.findElements(CellElementTag.value).firstOrNull;
           final value = formulaValueNode == null ? null : _parseValue(formulaValueNode).toString();
 
           return Formula(formula: formula, value: value);
