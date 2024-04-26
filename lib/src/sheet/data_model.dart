@@ -79,8 +79,7 @@ class Data extends Equatable {
 
   /// returns the string based cellId as A1, A2 or Z5
   CellIndex get cellIndex {
-    return CellIndex.indexByColumnRow(
-        columnIndex: _colIndex, rowIndex: _rowIndex);
+    return CellIndex.indexByColumnRow(columnIndex: _colIndex, rowIndex: _rowIndex);
   }
 
   /// Helps to set the formula
@@ -90,7 +89,7 @@ class Data extends Equatable {
   ///cell.setFormula('=SUM(1,2)');
   ///```
   void setFormula(String formula) {
-    _sheet.updateCell(cellIndex, Formula.custom(formula));
+    _sheet.updateCell(cellIndex, Formula(formula: formula, value: null));
   }
 
   set value(dynamic val) {

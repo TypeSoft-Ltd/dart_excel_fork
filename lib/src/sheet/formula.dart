@@ -1,24 +1,19 @@
 part of excel;
 
 class Formula {
-  late String _formula;
+  final String _formula;
+  final String? _computedValue;
 
-  Formula._(String formula) {
-    this._formula = formula;
-  }
+  /// Retrieves the original [formula] entered in the Excel file. If you wish to get the computed value, use the
+  /// [value] instead.
+  String get formula => _formula;
 
-  /// Helps to initiate a custom formula
-  ///```
-  ///var my_custom_formula = Formula.custom('=SUM(1,2)');
-  ///```
-  static Formula custom(String formula) {
-    return Formula._(formula);
-  }
+  /// Retrieves the computed value from [formula].
+  String? get value => _computedValue;
 
-  /// get Formula
-  get formula {
-    return this._formula;
-  }
+  const Formula({required String formula, String? value})
+      : _formula = formula,
+        _computedValue = value;
 
   @override
   String toString() {

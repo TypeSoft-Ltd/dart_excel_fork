@@ -446,6 +446,12 @@ class Parser {
     var name = node.getAttribute('name')!;
     var target = _worksheetTargets[node.getAttribute('r:id')];
 
+    // BUG FIX(Pavel): Some targets may be null. For example if we have a Chart Sheet, the Type attribute is not
+    // the _relationshipsWorksheet. Thus it is not parsed to the _worksheetTargets
+    if (target == null) {
+      return;
+    }
+
     if (_excel._sheetMap['$name'] == null) {
       _excel._sheetMap['$name'] = Sheet._(_excel, '$name');
     }
@@ -453,7 +459,7 @@ class Parser {
     Sheet sheetObject = _excel._sheetMap['$name']!;
 
     var filePath = 'xl/$target';
-    if (target != null && target.startsWith('/')) {
+    if (target.startsWith('/')) {
       // python package saves the relation targets as an absolute path in archive
       filePath = target.substring(1);
     }
@@ -509,19 +515,19 @@ class Parser {
       return;
     }
 
-    var s1 = node.getAttribute('s');
-    int s = 0;
-    if (s1 != null) {
+    var styleIndexNode = node.getAttribute(CellAttributeTag.style);
+    int cellStyleIndex = 0;
+    if (styleIndexNode != null) {
       try {
-        s = int.parse(s1.toString());
+        cellStyleIndex = int.parse(styleIndexNode.toString());
       } catch (_) {}
 
-      String rC = node.getAttribute('r').toString();
+      String referenceNode = node.getAttribute(CellAttributeTag.reference).toString();
 
       if (_excel._cellStyleReferenced[name] == null) {
-        _excel._cellStyleReferenced[name] = {rC: s};
+        _excel._cellStyleReferenced[name] = {referenceNode: cellStyleIndex};
       } else {
-        _excel._cellStyleReferenced[name]![rC] = s;
+        _excel._cellStyleReferenced[name]![referenceNode] = cellStyleIndex;
       }
     }
 
@@ -529,10 +535,13 @@ class Parser {
       return;
     }
 
-    String? type = node.getAttribute('t');
+    String? type = node.getAttribute(CellAttributeTag.type);
+    final cellDataType = CellDataType.values.firstWhereOrNull((cellType) => cellType.stringType == type);
 
     // Traverse descendants in case of 'inlineStr' instead of direct children and looks for different attribute
-    final valueNodes = type == 'inlineStr' ? node.findAllElements('t') : node.findElements('v');
+    final valueNodes = cellDataType == CellDataType.inlineString
+        ? node.findAllElements(CellElementTag.inlineString)
+        : node.findElements(CellElementTag.value);
     // BUG FIX: Cells containing formula can have a result of empty string.
     // Empty string is not parsed to XML, so even though children are not empty, there's no <v> tag present in children
     // We need to check that 'v' tag exists, otherwise we get Bad State: No Element error
@@ -540,19 +549,22 @@ class Parser {
 
     final value = _getValueForDataType(
       node: node,
-      dataType: type,
+      dataType: cellDataType,
       valueNode: valueXmlElement,
-      styleIndexNode: s1,
-      styleIndex: s,
+      styleIndexNode: styleIndexNode,
+      styleIndex: cellStyleIndex,
     );
 
-    sheetObject.updateCell(CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex), value,
-        cellStyle: _excel._cellStyleList[s]);
+    sheetObject.updateCell(
+      CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex),
+      value,
+      cellStyle: _excel._cellStyleList[cellStyleIndex],
+    );
   }
 
   dynamic _getValueForDataType({
     required XmlElement node,
-    required String? dataType,
+    required CellDataType? dataType,
     required XmlElement? valueNode,
     required String? styleIndexNode,
     required int styleIndex,
@@ -562,29 +574,28 @@ class Parser {
     }
 
     switch (dataType) {
-      // sharedString
-      case 's':
+      case CellDataType.sharedString:
         return _excel._sharedStrings.value(int.parse(_parseValue(valueNode)));
-      // boolean
-      case 'b':
+      case CellDataType.bool:
         return _parseValue(valueNode) == '1';
-      // error
-      case 'e':
-      // formula
-      case 'str':
+      case CellDataType.error:
+      case CellDataType.formulaString:
         return _parseValue(valueNode);
-      // inline string
-      case 'inlineStr':
+      case CellDataType.inlineString:
         // <c r='B2' t='inlineStr'>
         // <is><t>Dartonico</t></is>
         // </c>
         return _parseValue(valueNode);
-      // number
-      case 'n':
+      case CellDataType.number:
       default:
-        var formulaNode = node.findElements('f');
-        if (formulaNode.isNotEmpty) {
-          return Formula.custom(_parseValue(formulaNode.first).toString());
+        final formulaNode = node.findElements(CellElementTag.formula).firstOrNull;
+        if (formulaNode != null) {
+          final formulaValueNode = node.findElements(CellElementTag.value).firstOrNull;
+
+          final formula = _parseValue(formulaNode).toString();
+          final value = formulaValueNode == null ? null : _parseValue(formulaValueNode).toString();
+
+          return Formula(formula: formula, value: value);
         }
 
         if (styleIndexNode != null) {

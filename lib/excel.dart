@@ -6,6 +6,9 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
+import 'package:excel/src/parser/model/cell_attribute_tag.dart';
+import 'package:excel/src/parser/model/cell_data_type.dart';
+import 'package:excel/src/parser/model/cell_element_tag.dart';
 import 'package:xml/xml.dart';
 import 'src/web_helper/client_save_excel.dart'
     if (dart.library.html) 'src/web_helper/web_save_excel_browser.dart'
