@@ -449,7 +449,7 @@ class Parser {
     // BUG FIX(Pavel): Some targets may be null. For example if we have a Chart Sheet, the Type attribute is not
     // the _relationshipsWorksheet. Thus it is not parsed to the _worksheetTargets
     if (target == null) {
-      print('EXCEL PARSE ERROR: Failed to parse sheet $name. Proceeding without it');
+      // print('EXCEL PARSE ERROR: Failed to parse sheet $name. Proceeding without it');
       return;
     }
 
